@@ -69,7 +69,7 @@ export default function TicketGenerator({ onGenerated }: Props) {
               type="text"
               required
               placeholder="e.g. Jane Smith"
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent placeholder-gray-400"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent placeholder-gray-400"
             />
             <p className="mt-1 text-xs text-gray-400">
               This name will appear on the ticket PDF.

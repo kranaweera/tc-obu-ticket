@@ -15,6 +15,9 @@ interface EditState {
   notes: string;
 }
 
+const INPUT_CLS =
+  "w-full px-2 py-1 border border-blue-300 rounded text-sm text-gray-900 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500";
+
 export default function TicketList({ refreshKey }: { refreshKey: number }) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,6 +27,7 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const fetchTickets = useCallback(async () => {
     setLoading(true);
@@ -74,12 +78,27 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
     setDeletingId(id);
     try {
       const res = await fetch(`/api/tickets/${encodeURIComponent(id)}`, { method: "DELETE" });
-      if (res.ok) {
-        setTickets((prev) => prev.filter((t) => t.id !== id));
-      }
+      if (res.ok) setTickets((prev) => prev.filter((t) => t.id !== id));
     } finally {
       setDeletingId(null);
       setConfirmDeleteId(null);
+    }
+  }
+
+  async function downloadTicket(ticket: Ticket) {
+    setDownloadingId(ticket.id);
+    try {
+      const res = await fetch(`/api/tickets/${encodeURIComponent(ticket.id)}/download`);
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ticket-${ticket.id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloadingId(null);
     }
   }
 
@@ -120,7 +139,7 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name or ticket number…"
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent placeholder-gray-400"
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent placeholder-gray-400"
         />
         <button
           onClick={fetchTickets}
@@ -159,9 +178,13 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
                   const isEditing = editingId === ticket.id;
                   const isDeleting = deletingId === ticket.id;
                   const confirmingDelete = confirmDeleteId === ticket.id;
+                  const isDownloading = downloadingId === ticket.id;
 
                   return (
-                    <tr key={ticket.id} className={`${isEditing ? "bg-blue-50" : "hover:bg-gray-50"} transition-colors`}>
+                    <tr
+                      key={ticket.id}
+                      className={`${isEditing ? "bg-blue-50" : "hover:bg-gray-50"} transition-colors`}
+                    >
                       <td className="px-4 py-3 font-mono text-xs text-gray-600 whitespace-nowrap">
                         {ticket.id}
                       </td>
@@ -172,7 +195,7 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
                           <input
                             value={editState.name}
                             onChange={(e) => setEditState((s) => ({ ...s, name: e.target.value }))}
-                            className="w-full px-2 py-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className={INPUT_CLS}
                             autoFocus
                           />
                         ) : (
@@ -185,15 +208,19 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
                         {isEditing ? (
                           <select
                             value={editState.status}
-                            onChange={(e) => setEditState((s) => ({ ...s, status: e.target.value as TicketStatus }))}
-                            className="px-2 py-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                            onChange={(e) =>
+                              setEditState((s) => ({ ...s, status: e.target.value as TicketStatus }))
+                            }
+                            className="px-2 py-1 border border-blue-300 rounded text-sm text-gray-900 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                           >
                             <option value="valid">Valid</option>
                             <option value="used">Used</option>
                             <option value="cancelled">Cancelled</option>
                           </select>
                         ) : (
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[ticket.status]}`}>
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[ticket.status]}`}
+                          >
                             {ticket.status}
                           </span>
                         )}
@@ -201,12 +228,15 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
 
                       <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                         {new Date(ticket.issuedAt).toLocaleDateString(undefined, {
-                          day: "2-digit", month: "short", year: "numeric",
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
                         })}
                         <br />
                         <span className="text-gray-400">
                           {new Date(ticket.issuedAt).toLocaleTimeString(undefined, {
-                            hour: "2-digit", minute: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
                           })}
                         </span>
                       </td>
@@ -218,7 +248,7 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
                             value={editState.notes}
                             onChange={(e) => setEditState((s) => ({ ...s, notes: e.target.value }))}
                             placeholder="Optional note…"
-                            className="w-full px-2 py-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className={INPUT_CLS}
                           />
                         ) : (
                           <span className="text-gray-400 italic">{ticket.notes ?? "—"}</span>
@@ -264,6 +294,14 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
                         ) : (
                           <div className="flex items-center justify-end gap-1">
                             <button
+                              onClick={() => downloadTicket(ticket)}
+                              disabled={isDownloading}
+                              className="p-1.5 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50 transition-colors disabled:opacity-50"
+                              title="Re-download PDF"
+                            >
+                              {isDownloading ? <SpinnerIcon /> : <DownloadIcon />}
+                            </button>
+                            <button
                               onClick={() => startEdit(ticket)}
                               className="p-1.5 text-gray-400 hover:text-gray-700 rounded hover:bg-gray-100 transition-colors"
                               title="Edit"
@@ -289,6 +327,14 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
         )}
       </div>
     </div>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+    </svg>
   );
 }
 
