@@ -156,12 +156,12 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
                 <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Ticket #</th>
-                <th className="px-4 py-3">Payment Ref</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Issued</th>
-                <th className="px-4 py-3">By</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-3 py-3">Ticket #</th>
+                <th className="px-3 py-3">Payment Ref</th>
+                <th className="px-3 py-3">Status</th>
+                <th className="px-3 py-3">Issued</th>
+                <th className="px-3 py-3">By</th>
+                <th className="px-3 py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -178,68 +178,67 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
                       className={`${isEditing ? "bg-blue-50" : "hover:bg-gray-50"} transition-colors`}
                     >
                       <td className="px-4 py-3 font-medium text-gray-900">{ticket.name}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-gray-500">{ticket.id}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-gray-600">{ticket.paymentReference}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3 font-mono text-xs text-gray-500 whitespace-nowrap">{ticket.id}</td>
+                      <td className="px-3 py-3 font-mono text-xs text-gray-600">{ticket.paymentReference}</td>
+                      <td className="px-3 py-3">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[ticket.status]}`}>
                           {ticket.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                      <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">
                         {new Date(ticket.issuedAt).toLocaleDateString(undefined, {
-                          day: "2-digit", month: "short", year: "numeric",
+                          day: "2-digit", month: "short",
                         })}
                         {" "}
                         <span className="text-gray-400">
                           {new Date(ticket.issuedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-400 max-w-28 truncate" title={ticket.createdBy}>
+                      <td className="px-3 py-3 text-xs text-gray-400 whitespace-nowrap" title={ticket.createdBy}>
                         {ticket.createdBy.split("@")[0]}
                       </td>
 
                       {/* Actions */}
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-3 py-3">
                         {confirmingDelete ? (
-                          <div className="flex items-center justify-end gap-2">
-                            <span className="text-xs text-red-600 font-medium">Delete?</span>
+                          <div className="flex items-center gap-1">
                             <button
                               onClick={() => confirmDelete(ticket.id)}
                               disabled={isDeleting}
-                              className="px-2.5 py-1 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700 disabled:opacity-50"
+                              className="px-2 py-1 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700 disabled:opacity-50"
                             >
                               {isDeleting ? "…" : "Yes"}
                             </button>
                             <button
                               onClick={() => setConfirmDeleteId(null)}
-                              className="px-2.5 py-1 border border-gray-300 text-gray-600 rounded text-xs hover:bg-gray-50"
+                              className="px-2 py-1 border border-gray-300 text-gray-600 rounded text-xs hover:bg-gray-50"
                             >
                               No
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center gap-1">
                             <button
                               onClick={() => downloadTicket(ticket)}
                               disabled={isDownloading}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors disabled:opacity-50"
+                              className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors disabled:opacity-50"
+                              title="Download PDF"
                             >
                               {isDownloading ? <SpinnerIcon /> : <DownloadIcon />}
-                              {isDownloading ? "…" : "Download"}
                             </button>
                             <button
                               onClick={() => isEditing ? cancelEdit() : startEdit(ticket)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 transition-colors"
+                              className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${isEditing ? "bg-gray-200 text-gray-700 hover:bg-gray-300" : "bg-gray-50 text-gray-500 hover:bg-gray-100"}`}
+                              title={isEditing ? "Cancel edit" : "Edit name & payment ref"}
                             >
                               <PencilIcon />
-                              {isEditing ? "Cancel" : "Edit"}
                             </button>
                             <button
                               onClick={() => setConfirmDeleteId(ticket.id)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors"
+                              className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+                              title="Delete ticket"
                             >
                               <TrashIcon />
-                              Delete
                             </button>
                           </div>
                         )}
