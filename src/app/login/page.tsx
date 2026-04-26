@@ -2,8 +2,6 @@
 
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase-client";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,23 +12,25 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     const form = new FormData(e.currentTarget);
-    const email = form.get("email") as string;
-    const password = form.get("password") as string;
-
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push("/");
-    } catch (err: unknown) {
-      const code = (err as { code?: string }).code ?? "";
-      if (code === "auth/invalid-credential" || code === "auth/user-not-found" || code === "auth/wrong-password") {
-        setError("Invalid email or password.");
-      } else if (code === "auth/too-many-requests") {
-        setError("Too many attempts. Please try again later.");
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: form.get("email"),
+          password: form.get("password"),
+        }),
+      });
+      if (res.ok) {
+        router.push("/");
+        router.refresh();
       } else {
-        setError("Sign in failed. Please try again.");
+        const data = await res.json();
+        setError(data.error ?? "Login failed");
       }
+    } catch {
+      setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -42,12 +42,9 @@ export default function LoginPage() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Sign in</h1>
           <p className="text-sm text-gray-500 mb-6">Ticket generator portal</p>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <input
                 name="email"
                 type="email"
@@ -56,11 +53,8 @@ export default function LoginPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
               />
             </div>
-
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
               <input
                 name="password"
                 type="password"
@@ -69,13 +63,11 @@ export default function LoginPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
               />
             </div>
-
             {error && (
               <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 {error}
               </p>
             )}
-
             <button
               type="submit"
               disabled={loading}

@@ -1,9 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { auth } from "@/lib/firebase-client";
 import TicketGenerator from "./TicketGenerator";
 import TicketScanner from "./TicketScanner";
 import TicketList from "./TicketList";
@@ -40,46 +38,22 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   },
 ];
 
-export default function Dashboard() {
+export default function Dashboard({ email }: { email: string }) {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("generate");
   const [ticketListKey, setTicketListKey] = useState(0);
 
-  useEffect(() => {
-    return onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setAuthLoading(false);
-      if (!u) router.replace("/login");
-    });
-  }, [router]);
-
   async function handleLogout() {
-    await signOut(auth);
+    await fetch("/api/auth/logout", { method: "POST" });
     router.replace("/login");
   }
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <svg className="w-6 h-6 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-        </svg>
-      </div>
-    );
-  }
-
-  if (!user) return null;
-
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Nav */}
       <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
         <h1 className="text-base font-semibold text-gray-900">Ticket Portal</h1>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-400 hidden sm:block">{user.email}</span>
+          <span className="text-sm text-gray-400 hidden sm:block">{email}</span>
           <button
             onClick={handleLogout}
             className="text-sm text-gray-500 hover:text-gray-800 transition-colors"
@@ -89,7 +63,6 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      {/* Tab bar */}
       <div className="bg-white border-b border-gray-200 px-6">
         <div className="max-w-4xl mx-auto flex gap-1">
           {TABS.map((tab) => (
@@ -109,7 +82,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Tab content */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         {activeTab === "generate" && (
           <section>
@@ -120,25 +92,19 @@ export default function Dashboard() {
             </div>
           </section>
         )}
-
         {activeTab === "scan" && (
           <section>
             <h2 className="text-xl font-bold text-gray-900 mb-1">Scan &amp; Check In</h2>
-            <p className="text-sm text-gray-500 mb-6">
-              Validate tickets at the door. Use a USB barcode scanner or the device camera.
-            </p>
+            <p className="text-sm text-gray-500 mb-6">Validate tickets at the door. Use a USB barcode scanner or device camera.</p>
             <div className="max-w-lg">
               <TicketScanner />
             </div>
           </section>
         )}
-
         {activeTab === "tickets" && (
           <section>
             <h2 className="text-xl font-bold text-gray-900 mb-1">Issued Tickets</h2>
-            <p className="text-sm text-gray-500 mb-6">
-              View, edit, or delete tickets. Click the pencil to edit inline.
-            </p>
+            <p className="text-sm text-gray-500 mb-6">View, edit, or delete tickets. Click the pencil to edit inline.</p>
             <TicketList refreshKey={ticketListKey} />
           </section>
         )}

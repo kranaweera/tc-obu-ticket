@@ -9,7 +9,6 @@ import {
   KeyboardEvent,
 } from "react";
 import type { IScannerControls } from "@zxing/browser";
-import { authFetch } from "@/lib/authFetch";
 import type { Ticket } from "@/lib/types";
 
 type ScanResult =
@@ -39,7 +38,7 @@ export default function TicketScanner() {
     setScanning(true);
     setScanResult(null);
     try {
-      const res = await authFetch(`/api/tickets/${encodeURIComponent(cleaned)}/scan`, {
+      const res = await fetch(`/api/tickets/${encodeURIComponent(cleaned)}/scan`, {
         method: "POST",
       });
       const data = await res.json();

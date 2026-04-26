@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { authFetch } from "@/lib/authFetch";
 import type { Ticket, TicketStatus } from "@/lib/types";
 
 const STATUS_STYLES: Record<TicketStatus, string> = {
@@ -34,7 +33,7 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
   const fetchTickets = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await authFetch("/api/tickets");
+      const res = await fetch("/api/tickets", { headers: { "Content-Type": "application/json" } });
       if (res.ok) setTickets(await res.json());
     } catch {
       // auth not ready yet — silently ignore
@@ -60,7 +59,7 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
   async function saveEdit(id: string) {
     setSaving(true);
     try {
-      const res = await authFetch(`/api/tickets/${encodeURIComponent(id)}`, {
+      const res = await fetch(`/api/tickets/${encodeURIComponent(id)}`, {
         method: "PUT",
         body: JSON.stringify({
           name: editState.name.trim(),
@@ -82,7 +81,7 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
   async function confirmDelete(id: string) {
     setDeletingId(id);
     try {
-      const res = await authFetch(`/api/tickets/${encodeURIComponent(id)}`, { method: "DELETE" });
+      const res = await fetch(`/api/tickets/${encodeURIComponent(id)}`, { method: "DELETE" });
       if (res.ok) setTickets((prev) => prev.filter((t) => t.id !== id));
     } finally {
       setDeletingId(null);
@@ -93,7 +92,7 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
   async function downloadTicket(ticket: Ticket) {
     setDownloadingId(ticket.id);
     try {
-      const res = await authFetch(`/api/tickets/${encodeURIComponent(ticket.id)}/download`);
+      const res = await fetch(`/api/tickets/${encodeURIComponent(ticket.id)}/download`);
       if (!res.ok) return;
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

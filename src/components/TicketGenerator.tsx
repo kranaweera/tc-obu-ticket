@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { authFetch } from "@/lib/authFetch";
 
 type Status = "idle" | "loading" | "success" | "error";
 
@@ -24,8 +23,9 @@ export default function TicketGenerator({ onGenerated }: Props) {
     const paymentReference = (form.get("paymentReference") as string).trim();
 
     try {
-      const res = await authFetch("/api/generate-ticket", {
+      const res = await fetch("/api/generate-ticket", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, paymentReference }),
       });
 

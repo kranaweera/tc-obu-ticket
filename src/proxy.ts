@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyToken } from "@/lib/auth";
 
-// Auth is handled client-side (Firebase Auth state) and server-side (Firebase Admin token
-// verification in each API route). No middleware session check needed.
-export function proxy(_request: NextRequest) {
+const PUBLIC = ["/login", "/api/auth/login"];
+
+export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  if (PUBLIC.some((p) => pathname.startsWith(p))) return NextResponse.next();
+
+  const token = request.cookies.get("session")?.value;
+  if (!token || !(await verifyToken(token))) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
   return NextResponse.next();
 }
 
