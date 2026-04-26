@@ -9,25 +9,19 @@ const STATUS_STYLES: Record<TicketStatus, string> = {
   cancelled: "bg-red-100 text-red-700",
 };
 
-interface EditState {
-  name: string;
-  status: TicketStatus;
-  paymentReference: string;
-  notes: string;
-}
-
 const INPUT_CLS =
-  "w-full px-2 py-1 border border-blue-300 rounded text-sm text-gray-900 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500";
+  "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent";
 
 export default function TicketList({ refreshKey }: { refreshKey: number }) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editState, setEditState] = useState<EditState>({ name: "", status: "valid", paymentReference: "", notes: "" });
+  const [editName, setEditName] = useState("");
+  const [editPayRef, setEditPayRef] = useState("");
   const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const fetchTickets = useCallback(async () => {
@@ -36,37 +30,29 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
       const res = await fetch("/api/tickets", { headers: { "Content-Type": "application/json" } });
       if (res.ok) setTickets(await res.json());
     } catch {
-      // auth not ready yet — silently ignore
+      // auth not ready
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchTickets();
-  }, [fetchTickets, refreshKey]);
+  useEffect(() => { fetchTickets(); }, [fetchTickets, refreshKey]);
 
   function startEdit(ticket: Ticket) {
     setEditingId(ticket.id);
-    setEditState({
-      name: ticket.name,
-      status: ticket.status,
-      paymentReference: ticket.paymentReference,
-      notes: ticket.notes ?? "",
-    });
+    setEditName(ticket.name);
+    setEditPayRef(ticket.paymentReference);
   }
+
+  function cancelEdit() { setEditingId(null); }
 
   async function saveEdit(id: string) {
     setSaving(true);
     try {
       const res = await fetch(`/api/tickets/${encodeURIComponent(id)}`, {
         method: "PUT",
-        body: JSON.stringify({
-          name: editState.name.trim(),
-          status: editState.status,
-          paymentReference: editState.paymentReference.trim(),
-          notes: editState.notes.trim() || undefined,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editName.trim(), paymentReference: editPayRef.trim() }),
       });
       if (res.ok) {
         const updated: Ticket = await res.json();
@@ -122,7 +108,7 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
 
   return (
     <div className="space-y-4">
-      {/* Stats row */}
+      {/* Stats */}
       <div className="grid grid-cols-4 gap-3">
         {[
           { label: "Total", value: counts.total, color: "text-gray-900" },
@@ -143,7 +129,7 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name, ticket number or payment ref…"
+          placeholder="Search by name, ticket # or payment ref…"
           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent placeholder-gray-400"
         />
         <button
@@ -166,176 +152,150 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
             {search ? "No tickets match your search." : "No tickets generated yet."}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  <th className="px-4 py-3 whitespace-nowrap">Ticket #</th>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3 whitespace-nowrap">Payment Ref</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Issued</th>
-                  <th className="px-4 py-3 whitespace-nowrap">Created By</th>
-                  <th className="px-4 py-3">Notes</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filtered.map((ticket) => {
-                  const isEditing = editingId === ticket.id;
-                  const isDeleting = deletingId === ticket.id;
-                  const confirmingDelete = confirmDeleteId === ticket.id;
-                  const isDownloading = downloadingId === ticket.id;
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Ticket #</th>
+                <th className="px-4 py-3">Payment Ref</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Issued</th>
+                <th className="px-4 py-3">By</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filtered.map((ticket) => {
+                const isEditing = editingId === ticket.id;
+                const confirmingDelete = confirmDeleteId === ticket.id;
+                const isDeleting = deletingId === ticket.id;
+                const isDownloading = downloadingId === ticket.id;
 
-                  return (
+                return (
+                  <>
                     <tr
                       key={ticket.id}
                       className={`${isEditing ? "bg-blue-50" : "hover:bg-gray-50"} transition-colors`}
                     >
-                      <td className="px-4 py-3 font-mono text-xs text-gray-600 whitespace-nowrap">
-                        {ticket.id}
-                      </td>
-
-                      <td className="px-4 py-3 font-medium text-gray-900 min-w-32">
-                        {isEditing ? (
-                          <input
-                            value={editState.name}
-                            onChange={(e) => setEditState((s) => ({ ...s, name: e.target.value }))}
-                            className={INPUT_CLS}
-                            autoFocus
-                          />
-                        ) : ticket.name}
-                      </td>
-
-                      <td className="px-4 py-3 min-w-32">
-                        {isEditing ? (
-                          <input
-                            value={editState.paymentReference}
-                            onChange={(e) => setEditState((s) => ({ ...s, paymentReference: e.target.value }))}
-                            className={INPUT_CLS}
-                          />
-                        ) : (
-                          <span className="text-xs font-mono text-gray-600">{ticket.paymentReference}</span>
-                        )}
-                      </td>
-
+                      <td className="px-4 py-3 font-medium text-gray-900">{ticket.name}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-gray-500">{ticket.id}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-gray-600">{ticket.paymentReference}</td>
                       <td className="px-4 py-3">
-                        {isEditing ? (
-                          <select
-                            value={editState.status}
-                            onChange={(e) =>
-                              setEditState((s) => ({ ...s, status: e.target.value as TicketStatus }))
-                            }
-                            className="px-2 py-1 border border-blue-300 rounded text-sm text-gray-900 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          >
-                            <option value="valid">Valid</option>
-                            <option value="used">Used</option>
-                            <option value="cancelled">Cancelled</option>
-                          </select>
-                        ) : (
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[ticket.status]}`}>
-                            {ticket.status}
-                          </span>
-                        )}
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[ticket.status]}`}>
+                          {ticket.status}
+                        </span>
                       </td>
-
                       <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                         {new Date(ticket.issuedAt).toLocaleDateString(undefined, {
                           day: "2-digit", month: "short", year: "numeric",
                         })}
-                        <br />
+                        {" "}
                         <span className="text-gray-400">
-                          {new Date(ticket.issuedAt).toLocaleTimeString(undefined, {
-                            hour: "2-digit", minute: "2-digit",
-                          })}
+                          {new Date(ticket.issuedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
                         </span>
                       </td>
-
-                      <td className="px-4 py-3 text-xs text-gray-500 max-w-36 truncate" title={ticket.createdBy}>
-                        {ticket.createdBy}
+                      <td className="px-4 py-3 text-xs text-gray-400 max-w-28 truncate" title={ticket.createdBy}>
+                        {ticket.createdBy.split("@")[0]}
                       </td>
 
-                      <td className="px-4 py-3 text-xs text-gray-500 min-w-24">
-                        {isEditing ? (
-                          <input
-                            value={editState.notes}
-                            onChange={(e) => setEditState((s) => ({ ...s, notes: e.target.value }))}
-                            placeholder="Optional note…"
-                            className={INPUT_CLS}
-                          />
-                        ) : (
-                          <span className="text-gray-400 italic">{ticket.notes ?? "—"}</span>
-                        )}
-                      </td>
-
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
-                        {isEditing ? (
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => saveEdit(ticket.id)}
-                              disabled={saving || !editState.name.trim()}
-                              className="px-3 py-1 bg-gray-900 text-white rounded text-xs font-medium hover:bg-gray-700 disabled:opacity-50"
-                            >
-                              {saving ? "Saving…" : "Save"}
-                            </button>
-                            <button
-                              onClick={() => setEditingId(null)}
-                              disabled={saving}
-                              className="px-3 py-1 border border-gray-300 text-gray-600 rounded text-xs hover:bg-gray-50"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : confirmingDelete ? (
+                      {/* Actions */}
+                      <td className="px-4 py-3 text-right">
+                        {confirmingDelete ? (
                           <div className="flex items-center justify-end gap-2">
                             <span className="text-xs text-red-600 font-medium">Delete?</span>
                             <button
                               onClick={() => confirmDelete(ticket.id)}
                               disabled={isDeleting}
-                              className="px-3 py-1 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700 disabled:opacity-50"
+                              className="px-2.5 py-1 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700 disabled:opacity-50"
                             >
                               {isDeleting ? "…" : "Yes"}
                             </button>
                             <button
                               onClick={() => setConfirmDeleteId(null)}
-                              className="px-3 py-1 border border-gray-300 text-gray-600 rounded text-xs hover:bg-gray-50"
+                              className="px-2.5 py-1 border border-gray-300 text-gray-600 rounded text-xs hover:bg-gray-50"
                             >
                               No
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-end gap-1">
+                          <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => downloadTicket(ticket)}
                               disabled={isDownloading}
-                              className="p-1.5 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50 transition-colors disabled:opacity-50"
-                              title="Re-download PDF"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors disabled:opacity-50"
                             >
                               {isDownloading ? <SpinnerIcon /> : <DownloadIcon />}
+                              {isDownloading ? "…" : "Download"}
                             </button>
                             <button
-                              onClick={() => startEdit(ticket)}
-                              className="p-1.5 text-gray-400 hover:text-gray-700 rounded hover:bg-gray-100 transition-colors"
-                              title="Edit"
+                              onClick={() => isEditing ? cancelEdit() : startEdit(ticket)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 transition-colors"
                             >
                               <PencilIcon />
+                              {isEditing ? "Cancel" : "Edit"}
                             </button>
                             <button
                               onClick={() => setConfirmDeleteId(ticket.id)}
-                              className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50 transition-colors"
-                              title="Delete"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors"
                             >
                               <TrashIcon />
+                              Delete
                             </button>
                           </div>
                         )}
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+
+                    {/* Edit panel — expands below the row */}
+                    {isEditing && (
+                      <tr key={`edit-${ticket.id}`} className="bg-blue-50 border-b border-blue-100">
+                        <td colSpan={7} className="px-4 pb-4">
+                          <div className="bg-white border border-blue-200 rounded-xl p-4 space-y-3">
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Edit ticket</p>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
+                                <input
+                                  value={editName}
+                                  onChange={(e) => setEditName(e.target.value)}
+                                  className={INPUT_CLS}
+                                  autoFocus
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">Payment Reference</label>
+                                <input
+                                  value={editPayRef}
+                                  onChange={(e) => setEditPayRef(e.target.value)}
+                                  className={INPUT_CLS}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                onClick={() => saveEdit(ticket.id)}
+                                disabled={saving || !editName.trim()}
+                                className="px-4 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-medium hover:bg-gray-700 disabled:opacity-50"
+                              >
+                                {saving ? "Saving…" : "Save changes"}
+                              </button>
+                              <button
+                                onClick={cancelEdit}
+                                disabled={saving}
+                                className="px-4 py-1.5 border border-gray-300 text-gray-600 rounded-lg text-xs hover:bg-gray-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })}
+            </tbody>
+          </table>
         )}
       </div>
     </div>
@@ -344,7 +304,7 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
 
 function DownloadIcon() {
   return (
-    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+    <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
       <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
     </svg>
   );
@@ -352,7 +312,7 @@ function DownloadIcon() {
 
 function PencilIcon() {
   return (
-    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+    <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
       <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
     </svg>
   );
@@ -360,7 +320,7 @@ function PencilIcon() {
 
 function TrashIcon() {
   return (
-    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+    <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
       <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
     </svg>
   );
@@ -376,7 +336,7 @@ function RefreshIcon() {
 
 function SpinnerIcon() {
   return (
-    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+    <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
     </svg>
