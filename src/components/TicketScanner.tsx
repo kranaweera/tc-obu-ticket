@@ -76,13 +76,24 @@ export default function TicketScanner() {
     setCameraState("requesting");
     setCameraError("");
     try {
-      // Dynamic import keeps the heavy ZXing bundle out of the initial page load
       const { BrowserMultiFormatReader } = await import("@zxing/browser");
-      const reader = new BrowserMultiFormatReader();
+      const { DecodeHintType, BarcodeFormat } = await import("@zxing/library");
 
-      // decodeFromConstraints uses rear camera on phones, works in Safari
+      // Tell ZXing to focus only on Code128 and try harder — critical for mobile cameras
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.CODE_128]);
+      hints.set(DecodeHintType.TRY_HARDER, true);
+
+      const reader = new BrowserMultiFormatReader(hints);
+
       const controls = await reader.decodeFromConstraints(
-        { video: { facingMode: "environment" } },
+        {
+          video: {
+            facingMode: "environment",
+            width: { ideal: 1920 },   // higher res = easier to read narrow barcodes
+            height: { ideal: 1080 },
+          },
+        },
         videoRef.current!,
         (result, err) => {
           if (result) {
@@ -90,8 +101,7 @@ export default function TicketScanner() {
             stopCamera();
             lookupTicket(text);
           }
-          // err is populated on every frame that has no barcode — that's expected, ignore it
-          void err;
+          void err; // ZXing fires err on every empty frame — expected, not a real error
         }
       );
 
