@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, FormEvent } from "react";
+import { authFetch } from "@/lib/authFetch";
 
 type Status = "idle" | "loading" | "success" | "error";
 
@@ -20,12 +21,12 @@ export default function TicketGenerator({ onGenerated }: Props) {
 
     const form = new FormData(e.currentTarget);
     const name = (form.get("name") as string).trim();
+    const paymentReference = (form.get("paymentReference") as string).trim();
 
     try {
-      const res = await fetch("/api/generate-ticket", {
+      const res = await authFetch("/api/generate-ticket", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, paymentReference }),
       });
 
       if (!res.ok) {
@@ -59,7 +60,7 @@ export default function TicketGenerator({ onGenerated }: Props) {
   return (
     <div className="space-y-5">
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Attendee Name
@@ -71,9 +72,20 @@ export default function TicketGenerator({ onGenerated }: Props) {
               placeholder="e.g. Jane Smith"
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent placeholder-gray-400"
             />
-            <p className="mt-1 text-xs text-gray-400">
-              This name will appear on the ticket PDF.
-            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Payment Reference
+            </label>
+            <input
+              name="paymentReference"
+              type="text"
+              required
+              placeholder="e.g. PAY-2025-001 or bank transfer ref"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent placeholder-gray-400"
+            />
+            <p className="mt-1 text-xs text-gray-400">Receipt or transfer reference for this ticket.</p>
           </div>
 
           <button
@@ -105,11 +117,6 @@ export default function TicketGenerator({ onGenerated }: Props) {
           {errorMsg}
         </div>
       )}
-
-      <p className="text-xs text-gray-400">
-        PDF layout uses placeholder zones. Customise{" "}
-        <code className="font-mono">src/lib/generatePdf.ts</code> to apply your design.
-      </p>
     </div>
   );
 }

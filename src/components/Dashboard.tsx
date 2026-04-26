@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { useRouter } from "next/navigation";
+import { auth } from "@/lib/firebase-client";
 import TicketGenerator from "./TicketGenerator";
 import TicketScanner from "./TicketScanner";
 import TicketList from "./TicketList";
@@ -37,23 +40,38 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   },
 ];
 
-interface Props {
-  username: string;
-}
-
-export default function Dashboard({ username }: Props) {
+export default function Dashboard() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("generate");
-  // Incrementing this key causes TicketList to refetch
   const [ticketListKey, setTicketListKey] = useState(0);
 
-  function handleGenerated() {
-    setTicketListKey((k) => k + 1);
-  }
+  useEffect(() => {
+    return onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setAuthLoading(false);
+      if (!u) router.replace("/login");
+    });
+  }, [router]);
 
   async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/login";
+    await signOut(auth);
+    router.replace("/login");
   }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <svg className="w-6 h-6 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -61,7 +79,7 @@ export default function Dashboard({ username }: Props) {
       <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
         <h1 className="text-base font-semibold text-gray-900">Ticket Portal</h1>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-400 hidden sm:block">{username}</span>
+          <span className="text-sm text-gray-400 hidden sm:block">{user.email}</span>
           <button
             onClick={handleLogout}
             className="text-sm text-gray-500 hover:text-gray-800 transition-colors"
@@ -98,7 +116,7 @@ export default function Dashboard({ username }: Props) {
             <h2 className="text-xl font-bold text-gray-900 mb-1">Generate Ticket</h2>
             <p className="text-sm text-gray-500 mb-6">Create and download a PDF ticket for an attendee.</p>
             <div className="max-w-lg">
-              <TicketGenerator onGenerated={handleGenerated} />
+              <TicketGenerator onGenerated={() => setTicketListKey((k) => k + 1)} />
             </div>
           </section>
         )}
@@ -119,7 +137,7 @@ export default function Dashboard({ username }: Props) {
           <section>
             <h2 className="text-xl font-bold text-gray-900 mb-1">Issued Tickets</h2>
             <p className="text-sm text-gray-500 mb-6">
-              View, edit, or delete tickets. Click the pencil to edit name, status, or notes inline.
+              View, edit, or delete tickets. Click the pencil to edit inline.
             </p>
             <TicketList refreshKey={ticketListKey} />
           </section>

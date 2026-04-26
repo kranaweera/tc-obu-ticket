@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { authFetch } from "@/lib/authFetch";
 import type { Ticket, TicketStatus } from "@/lib/types";
 
 const STATUS_STYLES: Record<TicketStatus, string> = {
@@ -12,6 +13,7 @@ const STATUS_STYLES: Record<TicketStatus, string> = {
 interface EditState {
   name: string;
   status: TicketStatus;
+  paymentReference: string;
   notes: string;
 }
 
@@ -23,7 +25,7 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editState, setEditState] = useState<EditState>({ name: "", status: "valid", notes: "" });
+  const [editState, setEditState] = useState<EditState>({ name: "", status: "valid", paymentReference: "", notes: "" });
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -32,8 +34,10 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
   const fetchTickets = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/tickets");
+      const res = await authFetch("/api/tickets");
       if (res.ok) setTickets(await res.json());
+    } catch {
+      // auth not ready yet — silently ignore
     } finally {
       setLoading(false);
     }
@@ -45,22 +49,23 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
 
   function startEdit(ticket: Ticket) {
     setEditingId(ticket.id);
-    setEditState({ name: ticket.name, status: ticket.status, notes: ticket.notes ?? "" });
-  }
-
-  function cancelEdit() {
-    setEditingId(null);
+    setEditState({
+      name: ticket.name,
+      status: ticket.status,
+      paymentReference: ticket.paymentReference,
+      notes: ticket.notes ?? "",
+    });
   }
 
   async function saveEdit(id: string) {
     setSaving(true);
     try {
-      const res = await fetch(`/api/tickets/${encodeURIComponent(id)}`, {
+      const res = await authFetch(`/api/tickets/${encodeURIComponent(id)}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: editState.name.trim(),
           status: editState.status,
+          paymentReference: editState.paymentReference.trim(),
           notes: editState.notes.trim() || undefined,
         }),
       });
@@ -77,7 +82,7 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
   async function confirmDelete(id: string) {
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/tickets/${encodeURIComponent(id)}`, { method: "DELETE" });
+      const res = await authFetch(`/api/tickets/${encodeURIComponent(id)}`, { method: "DELETE" });
       if (res.ok) setTickets((prev) => prev.filter((t) => t.id !== id));
     } finally {
       setDeletingId(null);
@@ -88,7 +93,7 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
   async function downloadTicket(ticket: Ticket) {
     setDownloadingId(ticket.id);
     try {
-      const res = await fetch(`/api/tickets/${encodeURIComponent(ticket.id)}/download`);
+      const res = await authFetch(`/api/tickets/${encodeURIComponent(ticket.id)}/download`);
       if (!res.ok) return;
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -105,7 +110,8 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
   const filtered = tickets.filter(
     (t) =>
       t.name.toLowerCase().includes(search.toLowerCase()) ||
-      t.id.toLowerCase().includes(search.toLowerCase())
+      t.id.toLowerCase().includes(search.toLowerCase()) ||
+      t.paymentReference.toLowerCase().includes(search.toLowerCase())
   );
 
   const counts = {
@@ -138,7 +144,7 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name or ticket number…"
+          placeholder="Search by name, ticket number or payment ref…"
           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent placeholder-gray-400"
         />
         <button
@@ -165,10 +171,12 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  <th className="px-4 py-3">Ticket #</th>
+                  <th className="px-4 py-3 whitespace-nowrap">Ticket #</th>
                   <th className="px-4 py-3">Name</th>
+                  <th className="px-4 py-3 whitespace-nowrap">Payment Ref</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Issued</th>
+                  <th className="px-4 py-3 whitespace-nowrap">Created By</th>
                   <th className="px-4 py-3">Notes</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
@@ -189,8 +197,7 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
                         {ticket.id}
                       </td>
 
-                      {/* Name cell */}
-                      <td className="px-4 py-3 font-medium text-gray-900 min-w-36">
+                      <td className="px-4 py-3 font-medium text-gray-900 min-w-32">
                         {isEditing ? (
                           <input
                             value={editState.name}
@@ -198,12 +205,21 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
                             className={INPUT_CLS}
                             autoFocus
                           />
+                        ) : ticket.name}
+                      </td>
+
+                      <td className="px-4 py-3 min-w-32">
+                        {isEditing ? (
+                          <input
+                            value={editState.paymentReference}
+                            onChange={(e) => setEditState((s) => ({ ...s, paymentReference: e.target.value }))}
+                            className={INPUT_CLS}
+                          />
                         ) : (
-                          ticket.name
+                          <span className="text-xs font-mono text-gray-600">{ticket.paymentReference}</span>
                         )}
                       </td>
 
-                      {/* Status cell */}
                       <td className="px-4 py-3">
                         {isEditing ? (
                           <select
@@ -218,9 +234,7 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
                             <option value="cancelled">Cancelled</option>
                           </select>
                         ) : (
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[ticket.status]}`}
-                          >
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[ticket.status]}`}>
                             {ticket.status}
                           </span>
                         )}
@@ -228,21 +242,21 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
 
                       <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                         {new Date(ticket.issuedAt).toLocaleDateString(undefined, {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
+                          day: "2-digit", month: "short", year: "numeric",
                         })}
                         <br />
                         <span className="text-gray-400">
                           {new Date(ticket.issuedAt).toLocaleTimeString(undefined, {
-                            hour: "2-digit",
-                            minute: "2-digit",
+                            hour: "2-digit", minute: "2-digit",
                           })}
                         </span>
                       </td>
 
-                      {/* Notes cell */}
-                      <td className="px-4 py-3 text-xs text-gray-500 min-w-28">
+                      <td className="px-4 py-3 text-xs text-gray-500 max-w-36 truncate" title={ticket.createdBy}>
+                        {ticket.createdBy}
+                      </td>
+
+                      <td className="px-4 py-3 text-xs text-gray-500 min-w-24">
                         {isEditing ? (
                           <input
                             value={editState.notes}
@@ -255,7 +269,6 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
                         )}
                       </td>
 
-                      {/* Actions */}
                       <td className="px-4 py-3 text-right whitespace-nowrap">
                         {isEditing ? (
                           <div className="flex items-center justify-end gap-2">
@@ -267,7 +280,7 @@ export default function TicketList({ refreshKey }: { refreshKey: number }) {
                               {saving ? "Saving…" : "Save"}
                             </button>
                             <button
-                              onClick={cancelEdit}
+                              onClick={() => setEditingId(null)}
                               disabled={saving}
                               className="px-3 py-1 border border-gray-300 text-gray-600 rounded text-xs hover:bg-gray-50"
                             >

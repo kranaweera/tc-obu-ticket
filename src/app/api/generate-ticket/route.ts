@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { verifyAuth } from "@/lib/firebase-admin";
 import { generateTicketPdf } from "@/lib/generatePdf";
-import { saveTicket } from "@/lib/store";
+import { saveTicket } from "@/lib/firestore";
 
 function generateTicketNumber() {
   const prefix = "TCK";
@@ -11,24 +11,23 @@ function generateTicketNumber() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const decoded = await verifyAuth(req);
+  if (!decoded) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { name } = await req.json();
-  if (!name || typeof name !== "string" || name.trim().length === 0) {
-    return NextResponse.json({ error: "Name is required" }, { status: 400 });
-  }
+  const { name, paymentReference } = await req.json();
+  if (!name?.trim()) return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  if (!paymentReference?.trim()) return NextResponse.json({ error: "Payment reference is required" }, { status: 400 });
 
   const ticketNumber = generateTicketNumber();
-  const trimmedName = name.trim();
+  const trimmedName = (name as string).trim();
 
   await saveTicket({
     id: ticketNumber,
     name: trimmedName,
+    paymentReference: (paymentReference as string).trim(),
     issuedAt: new Date().toISOString(),
     status: "valid",
+    createdBy: decoded.email ?? decoded.uid,
   });
 
   const pdfBytes = await generateTicketPdf(trimmedName, ticketNumber);
