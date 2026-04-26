@@ -1,23 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { signToken } from "@/lib/auth";
 
-// Up to 3 accounts defined in environment variables
 function getAccounts() {
   return [
-    { email: process.env.ACCOUNT_1_EMAIL, hash: process.env.ACCOUNT_1_PASSWORD_HASH },
-    { email: process.env.ACCOUNT_2_EMAIL, hash: process.env.ACCOUNT_2_PASSWORD_HASH },
-    { email: process.env.ACCOUNT_3_EMAIL, hash: process.env.ACCOUNT_3_PASSWORD_HASH },
-  ].filter((a): a is { email: string; hash: string } =>
-    Boolean(a.email && a.hash)
+    { email: process.env.ACCOUNT_1_EMAIL, password: process.env.ACCOUNT_1_PASSWORD },
+    { email: process.env.ACCOUNT_2_EMAIL, password: process.env.ACCOUNT_2_PASSWORD },
+    { email: process.env.ACCOUNT_3_EMAIL, password: process.env.ACCOUNT_3_PASSWORD },
+  ].filter((a): a is { email: string; password: string } =>
+    Boolean(a.email && a.password)
   );
 }
 
 export async function POST(req: NextRequest) {
   const { email, password } = await req.json();
 
-  const account = getAccounts().find((a) => a.email === email);
-  if (!account || !(await bcrypt.compare(password, account.hash))) {
+  const account = getAccounts().find(
+    (a) => a.email === email && a.password === password
+  );
+
+  if (!account) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
